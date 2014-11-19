@@ -1,32 +1,37 @@
 package com.teamdev.arseniuk;
 
-import javax.xml.stream.XMLStreamException;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.io.*;
+import java.util.*;
 
 public class SystemInformation {
-    private final String systemInformationFileName = "sysinfo.xml";
-    CopyOnWriteArrayList<Item> items;
+    private final String SIZE_PROPERTIES = "size.properties";
+    private final String EXPIRE_PROPERTIES = "expire.properties";
+    private final String CREATION_PROPERTIES = "creation.properties";
+
+    Properties sizes;
+    Properties expirationDates;
+    Properties creationDates;
     private final String rootPath;
-    private Object flag;
 
-    public SystemInformation(String rootPath, Object flag) throws IOException {
+    public SystemInformation(String rootPath) throws IOException {
         this.rootPath = rootPath;
-        this.flag = flag;
-        items = new CopyOnWriteArrayList<Item>();
-        File targetFile = new File(rootPath + systemInformationFileName);
+        sizes = new Properties();
+        expirationDates = new Properties();
+        creationDates = new Properties();
         createFolder(rootPath);
-        if (!targetFile.exists()) {
-            targetFile.createNewFile();
-            save();
+        File file = new File(rootPath + SIZE_PROPERTIES);
+        if (!file.exists()) {
+            file.createNewFile();
         }
-
+        file = new File(rootPath + EXPIRE_PROPERTIES);
+        if (!file.exists()) {
+            file.createNewFile();
+        }
+        file = new File(rootPath + CREATION_PROPERTIES);
+        if (!file.exists()) {
+            file.createNewFile();
+        }
+        read();
     }
 
     private void createFolder(String path) {
@@ -36,75 +41,109 @@ public class SystemInformation {
         }
     }
 
-    public boolean add(Item item) {
+    public boolean add(Item item) throws IOException {
         if (get(item.getKey()) != null) {
             return false;
         }
-        items.add(item);
+        addProperty(item);
+        save();
         return true;
     }
 
-    public boolean remove(String key) {
-        for (Item item : items) {
-            if (item.getKey().equals(key)) {
-                items.remove(item);
-                return true;
-            }
-        }
-        return false;
+    public boolean remove(String key) throws IOException {
+        removeProperty(key);
+        save();
+        return true;
     }
 
-    public boolean remove(Item item) {
-        return items.remove(item);
+    private void removeProperty(String key) {
+        sizes.remove(key);
+        expirationDates.remove(key);
+        creationDates.remove(key);
+    }
+
+    public boolean remove(Item item) throws IOException {
+        return remove(item.getKey());
     }
 
 
     public Item get(String key) {
-        for (Item item : items) {
-            if (item.getKey().equals(key)) {
-                return item;
-            }
+        final String size = sizes.getProperty(key);
+        final String expiration = expirationDates.getProperty(key);
+        final String creation = creationDates.getProperty(key);
+        if (size == null) {
+            return null;
         }
-        return null;
+
+        Item item = new Item();
+        item.setupKey(key);
+        item.setSize(Long.parseLong(size));
+        item.setCreationTime(Long.parseLong(creation));
+        item.setExpirationTime((Long.parseLong(expiration)));
+
+        return item;
     }
 
 
     public long usedSpace() {
         long size = 0;
-        for (Item item : items) {
-            size += item.getSize();
+        final Set<String> keys = sizes.stringPropertyNames();
+        for (String key : keys) {
+            final String sizeFromProperty = sizes.getProperty(key);
+            size += Long.parseLong(sizeFromProperty);
         }
         return size;
     }
 
-    public void save() {
-        synchronized (flag) {
-            SystemInformationWriter systemInformationWriter = new SystemInformationWriter(flag);
-            systemInformationWriter.setFile(rootPath + systemInformationFileName);
-            try {
-                systemInformationWriter.saveSystemInfo(items.iterator());
-            } catch (FileNotFoundException e) {
-                e.printStackTrace();
-            } catch (XMLStreamException e) {
-                e.printStackTrace();
-            }
-        }
+    public synchronized void save() throws IOException {
+        OutputStream outputStream = new FileOutputStream(rootPath + SIZE_PROPERTIES);
+        sizes.store(outputStream, null);
+        outputStream.close();
+
+        outputStream = new FileOutputStream(rootPath + EXPIRE_PROPERTIES);
+        expirationDates.store(outputStream, null);
+        outputStream.close();
+
+        outputStream = new FileOutputStream(rootPath + CREATION_PROPERTIES);
+        creationDates.store(outputStream, null);
+        outputStream.close();
+
     }
 
-    public void read() {
-        synchronized (flag) {
-            SystemInformationReader systemInformationReader = new SystemInformationReader(flag);
-            final List<Item> threadUnsafeList = systemInformationReader.readConfig(rootPath + systemInformationFileName);
-            items = new CopyOnWriteArrayList<Item>(threadUnsafeList);
-        }
+    public Properties getSizes() {
+        return sizes;
     }
 
-    public Iterator<Item> getIterator() {
-        return items.iterator();
+    public Properties getExpirationDates() {
+        return expirationDates;
+    }
+
+    public Properties getCreationDates() {
+        return creationDates;
+    }
+
+    public void read() throws IOException {
+        InputStream inputStream = new FileInputStream(rootPath + SIZE_PROPERTIES);
+        sizes.load(inputStream);
+        inputStream.close();
+
+        inputStream = new FileInputStream(rootPath + EXPIRE_PROPERTIES);
+        expirationDates.load(inputStream);
+        inputStream.close();
+
+        inputStream = new FileInputStream(rootPath + CREATION_PROPERTIES);
+        creationDates.load(inputStream);
+        inputStream.close();
+    }
+
+    private void addProperty(Item item) throws IOException {
+        sizes.setProperty(item.getKey(), String.valueOf(item.getSize()));
+        creationDates.setProperty(item.getKey(), String.valueOf(item.getCreationTime()));
+        expirationDates.setProperty(item.getKey(), String.valueOf(item.getExpirationTime()));
     }
 
     public List<Item> itemsToRemove(long bytes) {
-        ArrayList<Item> sortingItems = new ArrayList<Item>(items);
+        ArrayList<Item> sortingItems = new ArrayList<Item>();
         Collections.sort(sortingItems);
         long summarySize = 0;
         List<Item> oldItems = new ArrayList<Item>();
@@ -115,5 +154,9 @@ public class SystemInformation {
             oldItems.add(item);
         }
         return oldItems;
+    }
+
+    public String getRootPath() {
+        return rootPath;
     }
 }

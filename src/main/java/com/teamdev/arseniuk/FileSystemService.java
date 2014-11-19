@@ -4,14 +4,20 @@ import java.io.*;
 
 public class FileSystemService {
 
-    public void saveFile(String path, InputStream inputStream) throws IOException {
-        byte[] buffer = new byte[inputStream.available()];
-        inputStream.read(buffer);
+    public int saveFile(String path, InputStream inputStream) throws IOException {
+        int bytesCount = 0;
         final File file = new File(path);
         createFolder(file.getParent());
-        //file.createNewFile();
+        file.createNewFile();
         OutputStream outStream = new FileOutputStream(file);
-        outStream.write(buffer);
+
+        byte[] buffer = new byte[1024];
+        int bytesRead;
+        while ((bytesRead = inputStream.read(buffer)) != -1) {
+            outStream.write(buffer, 0, bytesRead);
+            bytesCount += bytesRead;
+        }
+        return bytesCount * Byte.SIZE;
     }
 
     public InputStream readFile(String path) throws FileNotFoundException {

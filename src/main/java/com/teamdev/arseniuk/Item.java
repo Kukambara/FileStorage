@@ -1,14 +1,8 @@
 package com.teamdev.arseniuk;
 
-public class Item implements Comparable<Item> {
-    public static final String SYSTEM_INFO = "system_info";
-    public static final String ITEM = "item";
-    public static final String KEY = "key";
-    public static final String PATH = "path";
-    public static final String SIZE = "size";
-    public static final String EXPIRATION_TIME = "expiration_time";
-    public static final String CREATION_TIME = "creation_time";
+import java.io.File;
 
+public class Item implements Comparable<Item> {
     private String key;
     private String path;
     private long size;
@@ -19,16 +13,13 @@ public class Item implements Comparable<Item> {
         return key;
     }
 
-    public void setKey(String key) {
+    public void setupKey(String key) {
         this.key = key;
+        this.path = getFileRelativePath(key);
     }
 
     public String getPath() {
         return path;
-    }
-
-    public void setPath(String path) {
-        this.path = path;
     }
 
     public long getSize() {
@@ -58,5 +49,16 @@ public class Item implements Comparable<Item> {
     @Override
     public int compareTo(Item other) {
         return (int) (this.expirationTime - other.getExpirationTime());
+    }
+
+    private String getFileRelativePath(String key) {
+        final int half = 10000;
+        final int hashCode = key.hashCode();
+        final String fileName = key.replaceAll("([^a-z^A-Z^0-9])", "_");
+        StringBuilder path = new StringBuilder();
+        path.append(String.valueOf(hashCode / half)).append(File.separator);
+        path.append(String.valueOf(hashCode % half)).append(File.separator);
+        path.append(fileName);
+        return path.toString();
     }
 }

@@ -1,10 +1,16 @@
 package com.teamdev.arseniuk;
 
-import java.io.*;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.List;
 
+/**
+ * Saves files in file system.
+ *
+ * @author Dmytro Arseniuk
+ */
 public class FileStorageImpl implements FileStorage {
 
     /**
@@ -27,7 +33,7 @@ public class FileStorageImpl implements FileStorage {
     /**
      * Flag for synchronized methods, it's not working yet.
      */
-    private Object flag;
+    //private Object flag;
     final Thread thread;
 
     /**
@@ -38,27 +44,29 @@ public class FileStorageImpl implements FileStorage {
      * @throws IOException
      */
     public FileStorageImpl(String rootFolder, long maxDiskSpace) throws IOException {
-        flag = new Object();
         this.rootFolder = rootFolder;
         this.maxDiskSpace = maxDiskSpace;
-        createFolder(rootFolder);
-        systemInformation = new SystemInformation(rootFolder, flag);
-        removeService = new RemoveService(systemInformation, flag);
+        systemInformation = new SystemInformation(rootFolder);
+        removeService = new RemoveService(systemInformation);
         thread = new Thread(removeService);
-        //thread.start();
-    }
-
-    @Override
-    public void saveFile(String key, InputStream inputStream) throws IOException {
-        saveFile(key, inputStream, -1);
     }
 
     /**
-     * Saves file into file system in specific path with folder hierarchy.
+     * Saves file and associate them with passed key.
      *
-     * Takes SHA-1 digest from @key. Digest it's byte array,
-     * so we create path where upper folder name in hierarchy - last array value,
-     * and lower folder name is first value.
+     * @param key         identifier for file.
+     * @param inputStream file which will be saved.
+     */
+    @Override
+    public boolean saveFile(String key, InputStream inputStream) throws IOException {
+        return saveFile(key, inputStream, -1);
+    }
+
+    /**
+     * Saves file into file system in specific path with folder hierarchy with expiration time.
+     * After this time file can be removed. It's relative time after creation.
+     * <p/>
+     * Takes hashcode() from @key. This hashcode
      *
      * @param key            identifier for file.
      * @param inputStream    file which will be saved.
@@ -66,37 +74,33 @@ public class FileStorageImpl implements FileStorage {
      * @throws IOException
      */
     @Override
-    public void saveFile(String key, InputStream inputStream, long expirationTime) throws IOException {
-        byte[] buffer = new byte[inputStream.available()];
-        inputStream.read(buffer);
-
-        systemInformation.read();
+    public boolean saveFile(String key, InputStream inputStream, long expirationTime) throws IOException {
         if (systemInformation.get(key) != null) {
-            return;
+            return false;
         }
 
-        final String filePath = rootFolder + getFileRelativePath(key) + "file";
-
         Item item = new Item();
-        item.setSize(buffer.length * Byte.SIZE);
+        item.setupKey(key);
         item.setExpirationTime(expirationTime);
-        item.setPath(filePath);
-        item.setKey(key);
         item.setCreationTime(System.currentTimeMillis());
 
-
         FileSystemService fileSystemService = new FileSystemService();
-        inputStream.reset();
-        fileSystemService.saveFile(filePath, inputStream);
+        final int fileSize = fileSystemService.saveFile(rootFolder + item.getPath(), inputStream);
 
+        item.setSize(fileSize);
         systemInformation.add(item);
-        systemInformation.save();
-
+        return true;
     }
 
+    /**
+     * Reads file from file system. If file exists return InputStream.
+     * If file not exists returns null.
+     *
+     * @param key identifier for file.
+     * @return input stream of file which was read.
+     */
     @Override
     public InputStream readFile(String key) throws FileNotFoundException {
-        systemInformation.read();
 
         final Item item = systemInformation.get(key);
         if (item == null) {
@@ -104,31 +108,42 @@ public class FileStorageImpl implements FileStorage {
         }
 
         FileSystemService fileSystemService = new FileSystemService();
-        return fileSystemService.readFile(item.getPath());
+        return fileSystemService.readFile(rootFolder + item.getPath());
     }
 
+    /**
+     * Purge oldest file from root directory.
+     *
+     * @return removed bytes
+     */
     @Override
-    public void purge(int percent) {
+    public void purge(int percent) throws IOException {
         final long bytes = maxDiskSpace * percent / 100;
         purge(bytes);
     }
 
+    /**
+     * Purge oldest file from root directory.
+     *
+     * @return removed bytes
+     */
     @Override
-    public void purge(long bytes) {
-        systemInformation.read();
+    public void purge(long bytes) throws IOException {
         final FileSystemService fileSystemService = new FileSystemService();
         final List<Item> items = systemInformation.itemsToRemove(bytes);
         for (Item item : items) {
-            fileSystemService.removeFile(item.getPath());
+            fileSystemService.removeFile(rootFolder + item.getPath());
             systemInformation.remove(item);
         }
-        systemInformation.save();
     }
 
+    /**
+     * Removes file by key.
+     *
+     * @param key identifier for file.
+     */
     @Override
-    public void removeFile(String key) {
-
-        systemInformation.read();
+    public void removeFile(String key) throws IOException {
         final Item item = systemInformation.get(key);
         /**
          * Can be already removed after expiration time or after purge.
@@ -136,65 +151,49 @@ public class FileStorageImpl implements FileStorage {
         if (item == null) {
             return;
         }
-        File file = new File(item.getPath());
+        File file = new File(rootFolder + item.getPath());
         if (file.delete()) {
             systemInformation.remove(key);
         }
-        systemInformation.save();
-
     }
 
+    /**
+     * Calculates available space.
+     *
+     * @return returns value in bytes.
+     */
     @Override
     public long freeStorageSpace() {
-        systemInformation.read();
         final long usedSpaced = systemInformation.usedSpace();
         return maxDiskSpace - usedSpaced;
     }
 
+    /**
+     * Calculates available space.
+     *
+     * @return returns value in percents.
+     */
     @Override
     public long freeProportionStorageSpace() {
-        systemInformation.read();
         final long usedSpaced = systemInformation.usedSpace();
         final long freeSpace = maxDiskSpace - usedSpaced;
         return freeSpace * 100 / maxDiskSpace;
     }
 
-    private void createFolder(String path) {
-        final File root = new File(path);
-        if (!root.exists() && !root.mkdirs()) {
-            throw new IllegalStateException("Couldn't create dir: " + root);
-        }
+    /**
+     * Starts service which will remove expired files.
+     */
+    @Override
+    public void startRemovingService() {
+        thread.start();
     }
 
-    private byte[] getSHA1Digest(String key) throws NoSuchAlgorithmException, UnsupportedEncodingException {
-        MessageDigest messageDigest = MessageDigest.getInstance("SHA-1");
-        messageDigest.reset();
-        messageDigest.update(key.getBytes("utf8"));
-        return messageDigest.digest();
-    }
 
-    private String getFileRelativePath(String key) {
-        StringBuilder path = new StringBuilder();
-        byte[] digest = null;
-        try {
-            digest = getSHA1Digest(key);
-        } catch (NoSuchAlgorithmException e) {
-            e.printStackTrace();
-        } catch (UnsupportedEncodingException e) {
-            e.printStackTrace();
-        }
-        if (digest == null) {
-            return null;
-        }
-
-        for (int i = digest.length - 1; i >= 0; i--) {
-            path.append(String.valueOf(digest[i]));
-            path.append(File.separator);
-        }
-        return path.toString();
-    }
-
-    public void stopService() {
+    /**
+     * Stops service.
+     */
+    @Override
+    public void stopRemovingService() {
         thread.isInterrupted();
     }
 }
