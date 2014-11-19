@@ -31,7 +31,7 @@ public class FileStorageTest {
     }
 
     @Test
-    public void testSaveFile() throws IOException {
+    public void testSaveFile() throws FileStorageException, IOException {
         InputStream inputStream = new ByteArrayInputStream(fileBytes);
         final String key = "file1";
         if (!fileStorage.saveFile(key, inputStream)) {
@@ -42,7 +42,7 @@ public class FileStorageTest {
 
 
     @Test
-    public void testSaveFileWithExpirationTime() throws IOException {
+    public void testSaveFileWithExpirationTime() throws FileStorageException, IOException {
         InputStream inputStream = new ByteArrayInputStream(fileBytes);
         final int expirationTime = 5 * 1000;
         final String key = "file2";
@@ -57,7 +57,7 @@ public class FileStorageTest {
     }
 
     @Test
-    public void testRemoveFile() throws IOException {
+    public void testRemoveFile() throws FileStorageException {
         final String key = "file1";
         fileStorage.removeFile(key);
     }
@@ -88,6 +88,7 @@ public class FileStorageTest {
 
         byte[] result;
         result = new byte[inputStream.available()];
+
         inputStream.read(result);
         assertArrayEquals(fileBytes, result);
     }

@@ -58,7 +58,7 @@ public class FileStorageImpl implements FileStorage {
      * @param inputStream file which will be saved.
      */
     @Override
-    public boolean saveFile(String key, InputStream inputStream) throws IOException {
+    public boolean saveFile(String key, InputStream inputStream) throws FileStorageException {
         return saveFile(key, inputStream, -1);
     }
 
@@ -74,7 +74,7 @@ public class FileStorageImpl implements FileStorage {
      * @throws IOException
      */
     @Override
-    public boolean saveFile(String key, InputStream inputStream, long expirationTime) throws IOException {
+    public boolean saveFile(String key, InputStream inputStream, long expirationTime) throws FileStorageException {
         if (systemInformation.get(key) != null) {
             return false;
         }
@@ -117,7 +117,7 @@ public class FileStorageImpl implements FileStorage {
      * @return removed bytes
      */
     @Override
-    public void purge(int percent) throws IOException {
+    public void purge(int percent) {
         final long bytes = maxDiskSpace * percent / 100;
         purge(bytes);
     }
@@ -128,12 +128,16 @@ public class FileStorageImpl implements FileStorage {
      * @return removed bytes
      */
     @Override
-    public void purge(long bytes) throws IOException {
+    public void purge(long bytes) {
         final FileSystemService fileSystemService = new FileSystemService();
         final List<Item> items = systemInformation.itemsToRemove(bytes);
         for (Item item : items) {
             fileSystemService.removeFile(rootFolder + item.getPath());
-            systemInformation.remove(item);
+            try {
+                systemInformation.remove(item);
+            } catch (FileStorageException e) {
+                e.printStackTrace();
+            }
         }
     }
 
@@ -143,7 +147,7 @@ public class FileStorageImpl implements FileStorage {
      * @param key identifier for file.
      */
     @Override
-    public void removeFile(String key) throws IOException {
+    public void removeFile(String key) throws FileStorageException {
         final Item item = systemInformation.get(key);
         /**
          * Can be already removed after expiration time or after purge.

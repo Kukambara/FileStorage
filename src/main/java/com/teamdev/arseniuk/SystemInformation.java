@@ -41,18 +41,26 @@ public class SystemInformation {
         }
     }
 
-    public boolean add(Item item) throws IOException {
+    public boolean add(Item item) throws FileStorageException {
         if (get(item.getKey()) != null) {
             return false;
         }
-        addProperty(item);
-        save();
+        try {
+            addProperty(item);
+            save();
+        } catch (IOException e) {
+            throw new FileStorageException("Problem with storing system information about stored file. " + e.getMessage());
+        }
         return true;
     }
 
-    public boolean remove(String key) throws IOException {
+    public boolean remove(String key) throws FileStorageException {
         removeProperty(key);
-        save();
+        try {
+            save();
+        } catch (IOException e) {
+            throw new FileStorageException("Problem with storing system information about stored file. " + e.getMessage());
+        }
         return true;
     }
 
@@ -62,7 +70,7 @@ public class SystemInformation {
         creationDates.remove(key);
     }
 
-    public boolean remove(Item item) throws IOException {
+    public boolean remove(Item item) throws FileStorageException {
         return remove(item.getKey());
     }
 
