@@ -1,5 +1,7 @@
 package com.teamdev.arseniuk;
 
+import com.teamdev.arseniuk.exception.FileStorageException;
+
 import java.io.FileNotFoundException;
 import java.io.InputStream;
 
@@ -23,8 +25,8 @@ public interface FileStorage {
 
     public long freeProportionStorageSpace();
 
-    public void startRemovingService();
+    public void startService();
 
-    public void stopRemovingService();
+    public void stopService();
 
 }

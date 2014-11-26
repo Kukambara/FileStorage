@@ -1,5 +1,7 @@
 package com.teamdev.arseniuk;
 
+import com.teamdev.arseniuk.exception.FileStorageException;
+
 import java.io.*;
 
 public class FileSystemService {

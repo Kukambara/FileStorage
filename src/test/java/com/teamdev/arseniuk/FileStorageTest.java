@@ -1,5 +1,6 @@
 package com.teamdev.arseniuk;
 
+import com.teamdev.arseniuk.exception.FileStorageException;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -21,13 +22,13 @@ public class FileStorageTest {
         final int maxDiskSpace = 100 * 1024;
         final String rootFolder = "/home/dmytro/rootFolder/";
         fileStorage = new FileStorageImpl(rootFolder, maxDiskSpace);
-        fileStorage.startRemovingService();
+        fileStorage.startService();
         fileBytes = new byte[]{1, 2, 3, 4, 5, 6, 7, 8, 9};
     }
 
     @After
     public void close() {
-        fileStorage.stopRemovingService();
+        fileStorage.stopService();
     }
 
     @Test

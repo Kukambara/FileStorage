@@ -1,5 +1,7 @@
 package com.teamdev.arseniuk;
 
+import com.teamdev.arseniuk.exception.FileStorageException;
+
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -59,18 +61,18 @@ public class FileStorageImpl implements FileStorage {
      */
     @Override
     public boolean saveFile(String key, InputStream inputStream) throws FileStorageException {
-        return saveFile(key, inputStream, -1);
+        return saveFile(key, inputStream, Item.WITHOUT_EXPIRATION);
     }
 
     /**
      * Saves file into file system in specific path with folder hierarchy with expiration time.
-     * After this time file can be removed. It's relative time after creation.
+     * After this time file can be removed automatically.
      * <p/>
      * Takes hashcode() from @key. This hashcode
      *
      * @param key            identifier for file.
      * @param inputStream    file which will be saved.
-     * @param expirationTime count of millis.
+     * @param expirationTime relative time after creation in millis.
      * @throws IOException
      */
     @Override
@@ -188,7 +190,7 @@ public class FileStorageImpl implements FileStorage {
      * Starts service which will remove expired files.
      */
     @Override
-    public void startRemovingService() {
+    public void startService() {
         thread.start();
     }
 
@@ -197,7 +199,7 @@ public class FileStorageImpl implements FileStorage {
      * Stops service.
      */
     @Override
-    public void stopRemovingService() {
+    public void stopService() {
         thread.isInterrupted();
     }
 }

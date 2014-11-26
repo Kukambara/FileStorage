@@ -1,4 +1,4 @@
-package com.teamdev.arseniuk;
+package com.teamdev.arseniuk.exception;
 
 public class FileStorageException extends Exception {
 

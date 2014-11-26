@@ -1,10 +1,13 @@
 package com.teamdev.arseniuk;
 
+import com.teamdev.arseniuk.exception.FileStorageException;
+
 import java.util.Properties;
 import java.util.Set;
 
 public class RemoveService implements Runnable {
 
+    public static final int SLEEP_TIME = 5000;
     private final SystemInformation systemInformation;
     private boolean isStopped = false;
 
@@ -22,7 +25,7 @@ public class RemoveService implements Runnable {
                 e.printStackTrace();
             }
             try {
-                Thread.sleep(5000);
+                Thread.sleep(SLEEP_TIME);
             } catch (InterruptedException e) {
                 return;
             }
@@ -39,7 +42,7 @@ public class RemoveService implements Runnable {
                 continue;
             }
             final long time = Long.parseLong(expirationDate);
-            if (expirationDate != null && time != -1) {
+            if (expirationDate != null && time != Item.WITHOUT_EXPIRATION) {
                 Item item = systemInformation.get(key);
                 if (item == null) {
                     continue;
