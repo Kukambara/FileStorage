@@ -1,6 +1,6 @@
 package com.teamdev.arseniuk;
 
-import com.teamdev.arseniuk.exception.FileStorageException;
+import com.teamdev.arseniuk.exception.FileNotFoundException;
 
 import java.io.*;
 import java.util.*;
@@ -10,14 +10,16 @@ public class SystemInformation {
     private final String EXPIRE_PROPERTIES = "expire.properties";
     private final String CREATION_PROPERTIES = "creation.properties";
 
-    Properties sizes;
-    Properties expirationDates;
-    Properties creationDates;
+    private Properties sizes;
+    private Properties expirationDates;
+    private Properties creationDates;
     private final String rootPath;
+    private final Object flag;
 
     public SystemInformation(String rootPath) throws IOException {
         this.rootPath = rootPath;
         sizes = new Properties();
+        flag = new Object();
         expirationDates = new Properties();
         creationDates = new Properties();
         createFolder(rootPath);
@@ -37,31 +39,32 @@ public class SystemInformation {
     }
 
     private void createFolder(String path) {
-        final File root = new File(path);
-        if (!root.exists() && !root.mkdirs()) {
-            throw new IllegalStateException("Couldn't create dir: " + root);
+        final File directoryPath = new File(path);
+        if (!directoryPath.exists() && !directoryPath.mkdirs()) {
+            throw new IllegalStateException("Couldn't create dir: " + directoryPath);
         }
     }
 
-    public boolean add(Item item) throws FileStorageException {
+    public boolean add(Item item) {
         if (get(item.getKey()) != null) {
             return false;
         }
+
         try {
             addProperty(item);
             save();
         } catch (IOException e) {
-            throw new FileStorageException("Problem with storing system information about stored file. " + e.getMessage());
+            throw new RuntimeException("Problem with storing system information about stored file. " + e.getMessage());
         }
         return true;
     }
 
-    public boolean remove(String key) throws FileStorageException {
+    public boolean remove(String key) {
         removeProperty(key);
         try {
             save();
         } catch (IOException e) {
-            throw new FileStorageException("Problem with storing system information about stored file. " + e.getMessage());
+            throw new RuntimeException("Problem with storing system information about stored file. " + e.getMessage());
         }
         return true;
     }
@@ -72,7 +75,7 @@ public class SystemInformation {
         creationDates.remove(key);
     }
 
-    public boolean remove(Item item) throws FileStorageException {
+    public boolean remove(Item item) {
         return remove(item.getKey());
     }
 
@@ -105,19 +108,20 @@ public class SystemInformation {
         return size;
     }
 
-    public synchronized void save() throws IOException {
-        OutputStream outputStream = new FileOutputStream(rootPath + SIZE_PROPERTIES);
-        sizes.store(outputStream, null);
-        outputStream.close();
+    public void save() throws IOException {
+        synchronized (flag) {
+            OutputStream outputStream = new FileOutputStream(rootPath + SIZE_PROPERTIES);
+            sizes.store(outputStream, null);
+            outputStream.close();
 
-        outputStream = new FileOutputStream(rootPath + EXPIRE_PROPERTIES);
-        expirationDates.store(outputStream, null);
-        outputStream.close();
+            outputStream = new FileOutputStream(rootPath + EXPIRE_PROPERTIES);
+            expirationDates.store(outputStream, null);
+            outputStream.close();
 
-        outputStream = new FileOutputStream(rootPath + CREATION_PROPERTIES);
-        creationDates.store(outputStream, null);
-        outputStream.close();
-
+            outputStream = new FileOutputStream(rootPath + CREATION_PROPERTIES);
+            creationDates.store(outputStream, null);
+            outputStream.close();
+        }
     }
 
     public Properties getSizes() {
@@ -133,17 +137,19 @@ public class SystemInformation {
     }
 
     public void read() throws IOException {
-        InputStream inputStream = new FileInputStream(rootPath + SIZE_PROPERTIES);
-        sizes.load(inputStream);
-        inputStream.close();
+        synchronized (flag) {
+            InputStream inputStream = new FileInputStream(rootPath + SIZE_PROPERTIES);
+            sizes.load(inputStream);
+            inputStream.close();
 
-        inputStream = new FileInputStream(rootPath + EXPIRE_PROPERTIES);
-        expirationDates.load(inputStream);
-        inputStream.close();
+            inputStream = new FileInputStream(rootPath + EXPIRE_PROPERTIES);
+            expirationDates.load(inputStream);
+            inputStream.close();
 
-        inputStream = new FileInputStream(rootPath + CREATION_PROPERTIES);
-        creationDates.load(inputStream);
-        inputStream.close();
+            inputStream = new FileInputStream(rootPath + CREATION_PROPERTIES);
+            creationDates.load(inputStream);
+            inputStream.close();
+        }
     }
 
     private void addProperty(Item item) throws IOException {
@@ -152,8 +158,11 @@ public class SystemInformation {
         expirationDates.setProperty(item.getKey(), String.valueOf(item.getExpirationTime()));
     }
 
-    public List<Item> itemsToRemove(long bytes) {
+    public List<Item> itemsToRemove(long bytes) throws FileNotFoundException {
         ArrayList<Item> sortingItems = new ArrayList<Item>();
+        for (String key : creationDates.stringPropertyNames()) {
+            sortingItems.add(get(key));
+        }
         Collections.sort(sortingItems);
         long summarySize = 0;
         List<Item> oldItems = new ArrayList<Item>();

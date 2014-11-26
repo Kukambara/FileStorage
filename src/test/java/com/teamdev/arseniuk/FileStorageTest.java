@@ -1,6 +1,8 @@
 package com.teamdev.arseniuk;
 
+import com.teamdev.arseniuk.exception.FileNotFoundException;
 import com.teamdev.arseniuk.exception.FileStorageException;
+import com.teamdev.arseniuk.exception.NotEnoughFreeDiskSpaceException;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -43,7 +45,7 @@ public class FileStorageTest {
 
 
     @Test
-    public void testSaveFileWithExpirationTime() throws FileStorageException, IOException {
+    public void testSaveFileWithExpirationTime() throws NotEnoughFreeDiskSpaceException, FileNotFoundException, IOException {
         InputStream inputStream = new ByteArrayInputStream(fileBytes);
         final int expirationTime = 5 * 1000;
         final String key = "file2";
@@ -58,18 +60,18 @@ public class FileStorageTest {
     }
 
     @Test
-    public void testRemoveFile() throws FileStorageException {
+    public void testRemoveFile() throws FileNotFoundException {
         final String key = "file1";
         fileStorage.removeFile(key);
     }
 
     @Test
-    public void testPurgeInPercent() throws IOException {
+    public void testPurgeInPercent() throws FileNotFoundException {
         fileStorage.purge(50);
     }
 
     @Test
-    public void testPurgeInBytes() throws IOException {
+    public void testPurgeInBytes() throws FileNotFoundException {
         fileStorage.purge(50l);
     }
 
@@ -79,7 +81,7 @@ public class FileStorageTest {
         System.out.println(freeSpace + "%");
     }
 
-    private void readFile(String key) throws IOException {
+    private void readFile(String key) throws FileNotFoundException, IOException {
         InputStream inputStream;
         inputStream = fileStorage.readFile(key);
         if (inputStream == null) {

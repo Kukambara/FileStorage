@@ -1,9 +1,9 @@
 package com.teamdev.arseniuk;
 
-import com.teamdev.arseniuk.exception.FileStorageException;
+import com.teamdev.arseniuk.exception.FileNotFoundException;
+import com.teamdev.arseniuk.exception.NotEnoughFreeDiskSpaceException;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
@@ -60,7 +60,7 @@ public class FileStorageImpl implements FileStorage {
      * @param inputStream file which will be saved.
      */
     @Override
-    public boolean saveFile(String key, InputStream inputStream) throws FileStorageException {
+    public boolean saveFile(String key, InputStream inputStream) throws NotEnoughFreeDiskSpaceException, FileNotFoundException {
         return saveFile(key, inputStream, Item.WITHOUT_EXPIRATION);
     }
 
@@ -76,7 +76,7 @@ public class FileStorageImpl implements FileStorage {
      * @throws IOException
      */
     @Override
-    public boolean saveFile(String key, InputStream inputStream, long expirationTime) throws FileStorageException {
+    public boolean saveFile(String key, InputStream inputStream, long expirationTime) throws NotEnoughFreeDiskSpaceException, FileNotFoundException {
         if (systemInformation.get(key) != null) {
             return false;
         }
@@ -87,7 +87,7 @@ public class FileStorageImpl implements FileStorage {
         item.setCreationTime(System.currentTimeMillis());
 
         FileSystemService fileSystemService = new FileSystemService();
-        final int fileSize = fileSystemService.saveFile(rootFolder + item.getPath(), inputStream);
+        final int fileSize = fileSystemService.saveFile(rootFolder + item.getPath(), inputStream, freeStorageSpace());
 
         item.setSize(fileSize);
         systemInformation.add(item);
@@ -119,7 +119,7 @@ public class FileStorageImpl implements FileStorage {
      * @return removed bytes
      */
     @Override
-    public void purge(int percent) {
+    public void purge(int percent) throws FileNotFoundException {
         final long bytes = maxDiskSpace * percent / 100;
         purge(bytes);
     }
@@ -130,16 +130,12 @@ public class FileStorageImpl implements FileStorage {
      * @return removed bytes
      */
     @Override
-    public void purge(long bytes) {
+    public void purge(long bytes) throws FileNotFoundException {
         final FileSystemService fileSystemService = new FileSystemService();
         final List<Item> items = systemInformation.itemsToRemove(bytes);
         for (Item item : items) {
             fileSystemService.removeFile(rootFolder + item.getPath());
-            try {
-                systemInformation.remove(item);
-            } catch (FileStorageException e) {
-                e.printStackTrace();
-            }
+            systemInformation.remove(item);
         }
     }
 
@@ -149,7 +145,7 @@ public class FileStorageImpl implements FileStorage {
      * @param key identifier for file.
      */
     @Override
-    public void removeFile(String key) throws FileStorageException {
+    public void removeFile(String key) throws com.teamdev.arseniuk.exception.FileNotFoundException {
         final Item item = systemInformation.get(key);
         /**
          * Can be already removed after expiration time or after purge.

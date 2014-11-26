@@ -50,14 +50,13 @@ public class Item implements Comparable<Item> {
 
     @Override
     public int compareTo(Item other) {
-        return (int) (this.expirationTime - other.getExpirationTime());
+        return (int) (this.creationTime - other.getCreationTime());
     }
 
     private String getFileRelativePath(String key) {
         final int half = 10000;
         final int hashCode = key.hashCode();
-        final String fileName = key.replaceAll("([^a-z^A-Z^0-9])", "_");
-        //final String fileName = key.replaceAll("\\/:*?\"<>|", "_");
+        final String fileName = key.replaceAll("[\\\\/:*?\"<>|]", "_");
         StringBuilder path = new StringBuilder();
         path.append(String.valueOf(hashCode / half)).append(File.separator);
         path.append(String.valueOf(hashCode % half)).append(File.separator);

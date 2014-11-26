@@ -1,25 +1,25 @@
 package com.teamdev.arseniuk;
 
-import com.teamdev.arseniuk.exception.FileStorageException;
+import com.teamdev.arseniuk.exception.NotEnoughFreeDiskSpaceException;
 
 import java.io.*;
 
 public class FileSystemService {
 
-    public int saveFile(String path, InputStream inputStream) throws FileStorageException {
+    public int saveFile(String path, InputStream inputStream, long freeDiskSpace) throws NotEnoughFreeDiskSpaceException {
         int bytesCount = 0;
         final File file = new File(path);
         createFolder(file.getParent());
         try {
             file.createNewFile();
         } catch (IOException e) {
-            throw new FileStorageException("Can't store new file");
+            throw new RuntimeException("Can't create file.");
         }
         OutputStream outStream = null;
         try {
             outStream = new FileOutputStream(file);
         } catch (FileNotFoundException e) {
-            throw new FileStorageException("File wasn't found.");
+            throw new RuntimeException("Problem with reading file.");
         }
 
         byte[] buffer = new byte[1024];
@@ -30,14 +30,24 @@ public class FileSystemService {
                 bytesCount += bytesRead;
             }
         } catch (IOException e) {
-            throw new FileStorageException(e.getMessage());
+            throw new RuntimeException("Problem with storing data. " + e.getMessage());
         }
+
+        if (bytesCount > freeDiskSpace) {
+            throw new NotEnoughFreeDiskSpaceException("Not enough free disk space.");
+        }
+
         return bytesCount * Byte.SIZE;
     }
 
-    public InputStream readFile(String path) throws FileNotFoundException {
+    public InputStream readFile(String path) throws com.teamdev.arseniuk.exception.FileNotFoundException {
         File file = new File(path);
-        FileInputStream fileInputStream = new FileInputStream(file);
+        FileInputStream fileInputStream = null;
+        try {
+            fileInputStream = new FileInputStream(file);
+        } catch (FileNotFoundException e) {
+            throw new com.teamdev.arseniuk.exception.FileNotFoundException(e.getMessage());
+        }
         return fileInputStream;
     }
 
